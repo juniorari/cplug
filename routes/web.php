@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\GrupoController;
 use Illuminate\Support\Facades\Route;
 
 /*
