@@ -11,6 +11,4 @@ class Grupo extends Model
 
     protected $fillable = ['nome', 'slug', 'moeda', 'moeda_id'];
 
-    public $timestamps = false;
-
 }

@@ -56,6 +56,7 @@ class GrupoController extends Controller
     /**
      * Store a newly created resource in storage.
      *
+     * @param Request $request
      * @return Response
      */
     public function store(Request $request)
@@ -108,7 +109,7 @@ class GrupoController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param int $id
+     * @param $slug
      * @return Response
      */
     public function show($slug)
@@ -119,7 +120,7 @@ class GrupoController extends Controller
                 return responseJson(Response::HTTP_NOT_FOUND, 'Grupo não encontrado', []);
             }
 
-            $res = $grupo //->orderBy($sort, $dir)
+            $res = $grupo
                 ->latest()
                 ->paginate(self::PER_PAGE);
 
@@ -149,18 +150,57 @@ class GrupoController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @param int $id
+     * @param Request $request
+     * @param $slug
      * @return Response
      */
-    public function update($slug)
+    public function update(Request $request, $slug)
     {
         try {
+
+            if (empty($request->moedas)) {
+                return responseJson(Response::HTTP_BAD_REQUEST, 'Erro', ['data' => ['moedas' => 'Campo Obrigatório']]);
+            }
+
             $grupo = Grupo::where('slug', $slug);
             if(!$grupo->count()) {
                 return responseJson(Response::HTTP_NOT_FOUND, 'Grupo não encontrado', []);
             }
 
-            $res = $grupo //->orderBy($sort, $dir)
+            DB::beginTransaction();
+
+            $ids = [];
+            $moedas = explode(",", $request->moedas);
+            if (!is_array($moedas)) {
+                $moedas = (array)$moedas;
+            }
+            $gr = clone $grupo;
+            $grupo = $grupo->first();
+
+            foreach ($moedas as $moeda) {
+                $data = Moeda::where('symbol', trim($moeda))->first();
+                if (!$data) {
+                    DB::rollBack();
+                    return responseJson(Response::HTTP_BAD_REQUEST, 'Erro', ['data' => ['moedas' => "Moeda '{$moeda}' não existe!"]]);
+                }
+                if (!in_array($data->id, $ids)) {
+                    Grupo::updateOrCreate(
+                        [
+                            'slug' => $slug,
+                            'moeda_id' => $data->id,
+                        ],
+                        [
+                            'nome' => $grupo->nome,
+                            'slug' => $slug,
+                            'moeda' => $data->symbol,
+                            'moeda_id' => $data->id,
+                    ]);
+                    $ids[] = $data->id;
+                }
+            }
+            DB::commit();
+
+            $res = $gr
                 ->latest()
                 ->paginate(self::PER_PAGE);
 
@@ -168,7 +208,7 @@ class GrupoController extends Controller
                 ->response()
                 ->getData(true);
 
-            return responseJson(Response::HTTP_OK, 'Sucesso', $rows);
+            return responseJson(Response::HTTP_OK, "'{$grupo->nome}' atualizado com sucesso", $rows);
 
         } catch (\Exception $e) {
             return responseJson(Response::HTTP_INTERNAL_SERVER_ERROR, 'Houve um erro desconhecido!', ['data' => ['error' => $e->getMessage()]]);
@@ -181,9 +221,22 @@ class GrupoController extends Controller
      * @param int $id
      * @return Response
      */
-    public function destroy($id)
+    public function destroy($slug)
     {
-        //
+        try {
+
+            $grupo = Grupo::where('slug', $slug);
+            if (!$grupo->count()) {
+                return responseJson(Response::HTTP_NOT_FOUND, 'Grupo não encontrado', []);
+            }
+
+            $grupo->delete();
+            return responseJson(Response::HTTP_OK, 'Grupo deletado com sucesso', []);
+
+        } catch (\Exception $e) {
+            return responseJson(Response::HTTP_INTERNAL_SERVER_ERROR, 'Houve um erro na tentativa de apagar o registro!', ['data' => ['error' => $e->getMessage()]]);
+        }
+
     }
 
 }

@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    return responseJson(200, 'OK', []);
 });
 
-//
-//Route::resource('grupos', GrupoController::class);
